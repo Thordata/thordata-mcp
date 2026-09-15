@@ -1,0 +1,8 @@
+listen_addr: ":8800"
+schema_endpoint: "https://api.thordata.com/serp/playground/schema?lang=en"
+serp_endpoint: "https://scraperapi.thordata.com/request"
+history_endpoint: "https://api.thordata.com/mcp/serp/history"
+statistics_endpoint: "https://api.thordata.com/mcp/serp/statistics"
+schema_timeout_ms: 30000
+timeout_ms: 120000
+shutdown_timeout_ms: 10000

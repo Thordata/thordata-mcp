@@ -1,0 +1,6 @@
+*.exe
+*.test
+*.out
+*.log
+thor-mcp-api
+docs/superpowers/
