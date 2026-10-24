@@ -1,0 +1,25 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.thordata/thordata-mcp",
+  "title": "Thordata SERP MCP Server",
+  "description": "Thordata SERP search, history, statistics, and engine schemas for MCP clients.",
+  "repository": {
+    "url": "https://github.com/Thordata/thordata-mcp",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.thordata.com/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Thordata SERP API key using the Bearer scheme.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
