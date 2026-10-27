@@ -1,6 +1,6 @@
 # Thordata MCP Server
 
-Connect [Thordata](https://www.thordata.com/serp-api/mcp?utm_source=MCP&utm_term=mcp) SERP to MCP-compatible AI agents and clients for real-time search, usage history, and statistics.
+Connect [Thordata](https://www.thordata.com/products/serp-api) SERP to MCP-compatible AI agents and clients for real-time search, usage history, and statistics.
 
 The Thordata SERP MCP Server exposes Thordata search capabilities through the Model Context Protocol (MCP), making it easy to integrate live search tools into agents, workflows, and MCP clients. In addition to real-time SERP requests, it also provides access to search history, usage statistics, and engine schema resources for richer integrations.
 
@@ -21,7 +21,7 @@ Most users connect to the **hosted Thordata MCP endpoint** — no installation, 
 
 ### 1. Get your API key
 
-Sign up at [Thordata](https://www.thordata.com/serp-api/mcp?utm_source=MCP&utm_term=mcp) and get your SERP API key from the dashboard.
+Sign up at [Thordata](https://www.thordata.com/products/serp-api) and get your SERP API key from the dashboard.
 
 ### 2. Connect your MCP client
 
