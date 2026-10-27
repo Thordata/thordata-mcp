@@ -21,7 +21,7 @@ Most users connect to the **hosted Thordata MCP endpoint** — no installation, 
 
 ### 1. Get your API key
 
-Sign up at [Thordata](https://www.thordata.com/products/serp-api) and get your SERP API key from the dashboard.
+Sign up at [Thordata](https://www.thordata.com/?ls=github&lk=flora-thordata) and get your SERP API key from the dashboard.
 
 ### 2. Connect your MCP client
 
