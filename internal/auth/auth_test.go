@@ -72,3 +72,43 @@ func TestMiddlewareStoresOnlyContextToken(t *testing.T) {
 		t.Fatal("background context unexpectedly has token")
 	}
 }
+
+func TestMiddlewareAcceptsDatasetKeyWithoutSerpToken(t *testing.T) {
+	var got string
+	h := Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got, _ = DatasetKeyFromContext(r.Context())
+		if _, ok := TokenFromContext(r.Context()); ok {
+			t.Error("dataset-only request must not get a SERP token")
+		}
+	}))
+	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	r.Header.Set("X-API-Key", "ac-api-key")
+	h.ServeHTTP(httptest.NewRecorder(), r)
+	if got != "ac-api-key" {
+		t.Fatalf("dataset key %q", got)
+	}
+}
+
+func TestExtractCredentialsKeepsBothIndependent(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	r.Header.Set("Authorization", "Bearer serp-token")
+	r.Header.Set("X-API-Key", "ac-api-key")
+	serp, datasetKey, err := ExtractCredentials(r)
+	if err != nil || serp != "serp-token" || datasetKey != "ac-api-key" {
+		t.Fatalf("serp=%q dataset=%q err=%v", serp, datasetKey, err)
+	}
+}
+
+func TestUnifiedPathTokenProvidesDatasetKey(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/api_unifiedtoken1234567890/mcp", nil)
+	serp, datasetKey, err := ExtractCredentials(r)
+	if err != nil || serp == "" || datasetKey != serp {
+		t.Fatalf("serp=%q dataset=%q err=%v", serp, datasetKey, err)
+	}
+	h := Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got, ok := DatasetKeyFromContext(r.Context()); !ok || got != datasetKey {
+			t.Errorf("dataset context=%q ok=%v", got, ok)
+		}
+	}))
+	h.ServeHTTP(httptest.NewRecorder(), r)
+}

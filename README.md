@@ -60,6 +60,41 @@ If your client supports custom headers, you can instead use the Bearer configura
 }
 ```
 
+### Dataset tools
+
+Dataset tools use the same unified API key as SERP tools. The path token, `Authorization: Bearer`, and `X-API-Key` all carry the same key, so no separate dataset credential is required:
+
+```json
+{
+  "mcpServers": {
+    "thordata": {
+      "url": "https://mcp.thordata.com/YOUR_API_KEY/mcp"
+    }
+  }
+}
+```
+
+If your client can set headers, either form works:
+
+```json
+{
+  "mcpServers": {
+    "thordata": {
+      "url": "https://mcp.thordata.com/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_API_KEY"
+      }
+    }
+  }
+}
+```
+
+`X-API-Key` is still supported and overrides the path token for dataset tools when both are present. If no API key is supplied, the dataset tools return `dataset_credential_required`.
+
+`fetch_dataset` is page-based: each call returns at most 10 records and charges the wallet once for that page. The first call creates an `order_id`; keep calling with `order_id`, `cursor`, and `page_no` until `next_cursor` is empty. All pages share one order in the wallet and backend.
+
+Use `list_datasets` to see the dataset packages currently available to your account. `get_dataset_info` returns the price and limits for one `dataset_key`. Neither call charges the wallet.
+
 For a Claude Code one-line install, run:
 
 ```text

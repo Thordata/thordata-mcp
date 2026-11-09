@@ -26,6 +26,7 @@ schema_endpoint: "https://api.thordata.com/serp/playground/schema?lang=en"
 serp_endpoint: "https://scraperapi.thordata.com/request"
 history_endpoint: "https://api.thordata.com/mcp/serp/history"
 statistics_endpoint: "https://api.thordata.com/mcp/serp/statistics"
+dataset_endpoint: "https://api.thordata.com/api/mcp-datasets/v1"
 schema_timeout_ms: 30000
 timeout_ms: 120000
 shutdown_timeout_ms: 10000
@@ -49,8 +50,9 @@ For local self-testing, point your MCP client at `http://127.0.0.1:8800/mcp` (or
 | `serp_endpoint` | Thordata SERP search endpoint. |
 | `history_endpoint` | Endpoint for the authenticated user's SERP history. |
 | `statistics_endpoint` | Endpoint for the authenticated user's SERP statistics. |
+| `dataset_endpoint` | Endpoint for the dataset tools. Defaults to the public dataset API. |
 | `schema_timeout_ms` | Timeout for loading the remote schema. Defaults to 30000 ms. |
-| `timeout_ms` | Timeout for SERP, history, and statistics upstream requests. Defaults to 120000 ms. |
+| `timeout_ms` | Timeout for SERP, history, statistics, and dataset upstream requests. Defaults to 120000 ms. |
 | `shutdown_timeout_ms` | Graceful HTTP server shutdown timeout. Defaults to 10000 ms. |
 
 The YAML decoder rejects unknown fields. Non-positive timeout values use the built-in defaults.

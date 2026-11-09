@@ -7,16 +7,27 @@ import (
 	"strings"
 )
 
-type contextKey struct{}
+type serpTokenKey struct{}
+type datasetKeyKey struct{}
 
-// WithToken stores the credential in request context only.
+// WithToken stores the SERP credential in request context only.
 func WithToken(ctx context.Context, token string) context.Context {
-	return context.WithValue(ctx, contextKey{}, token)
+	return context.WithValue(ctx, serpTokenKey{}, token)
 }
 
 func TokenFromContext(ctx context.Context) (string, bool) {
-	token, ok := ctx.Value(contextKey{}).(string)
+	token, ok := ctx.Value(serpTokenKey{}).(string)
 	return token, ok && token != ""
+}
+
+// WithDatasetKey stores the ac_api_keys credential used by dataset tools.
+func WithDatasetKey(ctx context.Context, key string) context.Context {
+	return context.WithValue(ctx, datasetKeyKey{}, key)
+}
+
+func DatasetKeyFromContext(ctx context.Context) (string, bool) {
+	key, ok := ctx.Value(datasetKeyKey{}).(string)
+	return key, ok && key != ""
 }
 
 func ExtractToken(r *http.Request) (string, error) {
@@ -48,7 +59,61 @@ func ExtractToken(r *http.Request) (string, error) {
 	return "", fmt.Errorf("missing SERP token")
 }
 
-// IsLikelyToken 根据凭据形态区分 token 与平台名称。
+// ExtractDatasetKey reads the dataset credential. API Keys and SERP Tokens are
+// unified, so the same token from X-API-Key, Bearer, or the path is accepted.
+func ExtractDatasetKey(r *http.Request) (string, error) {
+	if r == nil {
+		return "", fmt.Errorf("request is nil")
+	}
+	for _, header := range []string{"X-API-Key", "X-Thordata-Dataset-Key"} {
+		if value := r.Header.Get(header); value != "" {
+			value = strings.TrimSpace(value)
+			if value == "" || strings.ContainsAny(value, " \t\r\n") {
+				return "", fmt.Errorf("malformed dataset API key header")
+			}
+			return value, nil
+		}
+	}
+	// Unified token: the SERP token/path token is also the dataset API key.
+	if token, err := ExtractToken(r); err == nil {
+		return token, nil
+	}
+	return "", fmt.Errorf("missing dataset API key")
+}
+
+// ExtractCredentials returns both credentials independently. At least one is
+// required; SERP-only and dataset-only clients are both valid.
+func ExtractCredentials(r *http.Request) (serpToken, datasetKey string, err error) {
+	datasetKey, _ = ExtractDatasetKey(r)
+	serpToken, serpErr := ExtractToken(r)
+	if datasetKey == "" && serpErr != nil {
+		return "", "", serpErr
+	}
+	if serpErr != nil && datasetKey != "" {
+		serpToken = ""
+	}
+	return serpToken, datasetKey, nil
+}
+
+func Middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serpToken, datasetKey, err := ExtractCredentials(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+		ctx := r.Context()
+		if serpToken != "" {
+			ctx = WithToken(ctx, serpToken)
+		}
+		if datasetKey != "" {
+			ctx = WithDatasetKey(ctx, datasetKey)
+		}
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// IsLikelyToken keeps the existing path-token compatibility check.
 func IsLikelyToken(value string) bool {
 	if value == "" || strings.ContainsAny(value, " \t\r\n") {
 		return false
@@ -66,17 +131,5 @@ func IsLikelyToken(value string) bool {
 		}
 		return letter && digit
 	}
-	// 保留既有的 path-token 形式，同时拒绝普通平台路径。
 	return len(value) >= 10 && strings.Contains(value, "-")
-}
-
-func Middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token, err := ExtractToken(r)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
-			return
-		}
-		next.ServeHTTP(w, r.WithContext(WithToken(r.Context(), token)))
-	})
 }

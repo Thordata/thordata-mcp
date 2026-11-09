@@ -18,6 +18,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"gopkg.in/yaml.v3"
 	"thordata-mcp/internal/auth"
+	"thordata-mcp/internal/dataset"
 	"thordata-mcp/internal/schema"
 	"thordata-mcp/internal/serp"
 	"thordata-mcp/tools"
@@ -34,6 +35,7 @@ type config struct {
 	SerpEndpoint       string        `yaml:"serp_endpoint"`
 	HistoryEndpoint    string        `yaml:"history_endpoint"`
 	StatisticsEndpoint string        `yaml:"statistics_endpoint"`
+	DatasetEndpoint    string        `yaml:"dataset_endpoint"`
 	SchemaTimeout      time.Duration `yaml:"-"`
 	Timeout            time.Duration `yaml:"-"`
 	ShutdownTimeout    time.Duration `yaml:"-"`
@@ -86,6 +88,9 @@ func loadConfig(path string) (config, error) {
 	if cfg.SchemaTimeoutMS <= 0 {
 		cfg.SchemaTimeoutMS = 30000
 	}
+	if cfg.DatasetEndpoint == "" {
+		cfg.DatasetEndpoint = "https://api.thordata.com/api/mcp-datasets/v1"
+	}
 	if cfg.ShutdownTimeoutMS <= 0 {
 		cfg.ShutdownTimeoutMS = 10000
 	}
@@ -123,11 +128,16 @@ func isCompatMCPPath(path string) bool {
 func mcpHandler(cfg config) http.Handler {
 	cache := schema.NewCache(schema.NewClient(cfg.SchemaEndpoint, cfg.SchemaTimeout))
 	toolSet := tools.New(cache, serp.NewClient(cfg.SerpEndpoint), cfg.HistoryEndpoint, cfg.StatisticsEndpoint, cfg.Timeout)
+	toolSet.SetDatasetClient(dataset.NewClient(cfg.DatasetEndpoint, cfg.Timeout))
 	s := server.NewMCPServer(serverName, serverVersion, server.WithToolCapabilities(true), server.WithResourceCapabilities(true, true), server.WithRecovery(), server.WithOutputSchemaValidation())
 	s.AddTool(toolSet.ListEnginesTool(), toolSet.HandleListEngines)
 	s.AddTool(toolSet.SearchTool(), toolSet.HandleSearch)
 	s.AddTool(toolSet.HistoryTool(), toolSet.HandleHistory)
 	s.AddTool(toolSet.StatisticsTool(), toolSet.HandleStatistics)
+	s.AddTool(toolSet.FetchDatasetTool(), toolSet.HandleFetchDataset)
+	s.AddTool(toolSet.ListDatasetsTool(), toolSet.HandleListDatasets)
+	s.AddTool(toolSet.DatasetInfoTool(), toolSet.HandleDatasetInfo)
+	s.AddTool(toolSet.DatasetRequestStatusTool(), toolSet.HandleDatasetRequestStatus)
 	index := mcp.NewResource("thordata://engines", "Thor SERP engines", mcp.WithMIMEType("application/json"))
 	s.AddResource(index, func(ctx context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 		doc, err := cache.ListDocument(ctx)
@@ -155,11 +165,15 @@ func mcpHandler(cfg config) http.Handler {
 }
 
 func mcpHTTPContext(ctx context.Context, r *http.Request) context.Context {
-	if token, err := auth.ExtractToken(r); err == nil {
-		return auth.WithToken(ctx, token)
-	}
 	if token, ok := auth.TokenFromContext(r.Context()); ok {
-		return auth.WithToken(ctx, token)
+		ctx = auth.WithToken(ctx, token)
+	} else if token, err := auth.ExtractToken(r); err == nil {
+		ctx = auth.WithToken(ctx, token)
+	}
+	if key, ok := auth.DatasetKeyFromContext(r.Context()); ok {
+		ctx = auth.WithDatasetKey(ctx, key)
+	} else if key, err := auth.ExtractDatasetKey(r); err == nil {
+		ctx = auth.WithDatasetKey(ctx, key)
 	}
 	return ctx
 }

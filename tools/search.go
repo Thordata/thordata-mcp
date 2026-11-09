@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"thordata-mcp/internal/auth"
+	"thordata-mcp/internal/dataset"
 	"thordata-mcp/internal/schema"
 	"thordata-mcp/internal/serp"
 
@@ -17,6 +18,7 @@ import (
 type ToolSet struct {
 	cache              *schema.Cache
 	serpClient         *serp.Client
+	datasetClient      *dataset.Client
 	historyEndpoint    string
 	statisticsEndpoint string
 	httpClient         *httpClient
