@@ -1,7 +1,7 @@
 package schema
 
-// snapshotSchema 是已提交的 34 个当前引擎离线回退快照。
-// 仅保留公共查询字段，确保 MCP 可离线启动；远端成功加载后始终覆盖快照。
+// snapshotSchema is a committed offline fallback snapshot of the 34 current engines.
+// It keeps only public query fields so MCP can start offline; a successful remote load always overrides it.
 var snapshotSchema = buildSnapshot()
 
 func buildSnapshot() Schema {

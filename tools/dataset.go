@@ -242,7 +242,8 @@ func datasetIntArg(value any, fallback int) int {
 	return fallback
 }
 
-// datasetIntArgStrict 区分“没传”和“传了非法值”，非法值不能被 fallback 吞掉。
+// datasetIntArgStrict distinguishes "not provided" from "provided but invalid";
+// an invalid value must not be swallowed by the fallback.
 func datasetIntArgStrict(value any) (int, bool) {
 	switch v := value.(type) {
 	case int:
