@@ -56,7 +56,7 @@ func ExtractToken(r *http.Request) (string, error) {
 	if len(parts) == 2 && parts[1] == "mcp" && IsLikelyToken(parts[0]) {
 		return parts[0], nil
 	}
-	return "", fmt.Errorf("missing SERP token")
+	return "", fmt.Errorf("missing API key: provide Authorization: Bearer <API_KEY>, X-API-Key, or /<API_KEY>/mcp")
 }
 
 // ExtractDatasetKey reads the dataset credential. API Keys and SERP Tokens are

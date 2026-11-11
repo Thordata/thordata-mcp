@@ -52,7 +52,14 @@ func TestLoadConfigReadsConfiguredEndpointsAndTimeouts(t *testing.T) {
 	if cfg.SchemaTimeout != 30*time.Second {
 		t.Fatalf("production schema timeout = %s, want 30s", cfg.SchemaTimeout)
 	}
+	if cfg.WebScraperTimeout != 5*time.Minute {
+		t.Fatalf("web scraper timeout = %s, want 5m", cfg.WebScraperTimeout)
+	}
+	if cfg.WebScraperSchemaEndpoint != "https://api.thordata.com/web-scraper/schema" {
+		t.Fatalf("web scraper schema endpoint = %q", cfg.WebScraperSchemaEndpoint)
+	}
 }
+
 
 func TestLoadConfigDefaultsSchemaTimeout(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
@@ -65,6 +72,20 @@ func TestLoadConfigDefaultsSchemaTimeout(t *testing.T) {
 	}
 	if cfg.SchemaTimeout != 30*time.Second {
 		t.Fatalf("default schema timeout = %s, want 30s", cfg.SchemaTimeout)
+	}
+}
+
+func TestLoadConfigCapsWebScraperTimeoutAtFiveMinutes(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("web_scraper_timeout_ms: 999999\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := loadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.WebScraperTimeout != 5*time.Minute {
+		t.Fatalf("web scraper timeout = %s, want 5m", cfg.WebScraperTimeout)
 	}
 }
 

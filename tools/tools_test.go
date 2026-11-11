@@ -13,6 +13,7 @@ import (
 	"thordata-mcp/internal/auth"
 	"thordata-mcp/internal/schema"
 	"thordata-mcp/internal/serp"
+	"thordata-mcp/internal/webscraper"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -34,6 +35,81 @@ func TestToolSetRegistersExpectedTools(t *testing.T) {
 		if tool.Name == "" {
 			t.Fatal("tool name is empty")
 		}
+	}
+}
+
+func TestToolSetRegistersWebScraperTools(t *testing.T) {
+	toolSet := New(schema.NewCache(nil), serp.NewClient("http://127.0.0.1"), "", "")
+	toolSet.SetWebScraper(webscraper.NewCache(nil), webscraper.NewClient(webscraper.Endpoints{}, time.Second))
+	if got := toolSet.ListWebScrapersTool().Name; got != "list_web_scrapers" {
+		t.Fatalf("list tool name = %q", got)
+	}
+	fetch := toolSet.FetchWebScraperTool()
+	if fetch.Name != "fetch_web_scraper" {
+		t.Fatalf("fetch tool name = %q", fetch.Name)
+	}
+	if len(fetch.InputSchema.Required) != 2 || fetch.InputSchema.Required[0] != "spider_id" || fetch.InputSchema.Required[1] != "parameters" {
+		t.Fatalf("fetch required fields = %#v", fetch.InputSchema.Required)
+	}
+}
+
+func TestFetchWebScraperRequiresDatasetCredential(t *testing.T) {
+	toolSet := New(schema.NewCache(nil), serp.NewClient(""), "", "")
+	toolSet.SetWebScraper(webscraper.NewCache(nil), webscraper.NewClient(webscraper.Endpoints{}, time.Second))
+	result, err := toolSet.HandleFetchWebScraper(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Name: "fetch_web_scraper", Arguments: map[string]any{
+		"spider_id": "linkedin_company_information_by-url", "parameters": map[string]any{"url": "https://linkedin.com/company/example"},
+	}}})
+	if err != nil || result == nil || !result.IsError {
+		t.Fatalf("expected credential error, result=%v err=%v", result, err)
+	}
+	if len(result.Content) == 0 || !strings.Contains(result.Content[0].(mcp.TextContent).Text, "web_scraper_credential_required") {
+		t.Fatalf("credential error = %#v", result.Content)
+	}
+}
+
+func TestFetchWebScraperRunsSchemaAndTaskLifecycle(t *testing.T) {
+	const spiderID = "linkedin_company_information_by-url"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/operations":
+			_, _ = w.Write([]byte(`{"code":0,"data":{"schema_version":"1","resource":"web_scraper","operations":[{"value":"linkedin_company_information_by-url","name":"URL","spider_id":"linkedin_company_information_by-url","spider_name":"linkedin.com","product_type":"text","execution_path":"/builder"}]}}`))
+		case "/parameters":
+			_, _ = w.Write([]byte(`{"code":0,"data":{"schema_version":"1","resource":"web_scraper","spider_id":"linkedin_company_information_by-url","spider_name":"linkedin.com","product_type":"text","execution_path":"/builder","parameters":[{"key":"url","label":"URL","type":"string","control":"input","required":true,"default_value":null,"options":[],"operators":[]}],"general_parameters":[],"validation_rules":[],"warnings":[]}}`))
+		case "/builder":
+			if r.Header.Get("Authorization") != "Bearer dataset-key" {
+				t.Fatalf("builder authorization = %q", r.Header.Get("Authorization"))
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"code": 200, "data": map[string]any{"task_id": "task-tool"}})
+		case "/tasks-status":
+			_ = json.NewEncoder(w).Encode(map[string]any{"code": 200, "data": []any{map[string]any{"task_id": "task-tool", "status": "Ready"}}})
+		case "/tasks-download":
+			_ = json.NewEncoder(w).Encode(map[string]any{"code": 200, "data": map[string]any{"tasks_ids": "task-tool", "download": "http://" + r.Host + "/download?task_id=task-tool&type=json"}})
+		case "/download":
+			_, _ = w.Write([]byte(`[{"name":"Example","success":true}]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	toolSet := New(schema.NewCache(nil), serp.NewClient(""), "", "")
+	toolSet.SetWebScraper(webscraper.NewCache(webscraper.NewSchemaClient(server.URL, time.Second)), webscraper.NewClient(webscraper.Endpoints{Builder: server.URL + "/builder", TaskAPI: server.URL, Download: server.URL + "/download"}, time.Second))
+	result, err := toolSet.HandleFetchWebScraper(auth.WithDatasetKey(context.Background(), "dataset-key"), mcp.CallToolRequest{Params: mcp.CallToolParams{Name: "fetch_web_scraper", Arguments: map[string]any{"spider_id": spiderID, "parameters": map[string]any{"url": "https://linkedin.com/company/example"}, "max_wait_seconds": 30}}})
+	if err != nil || result == nil || result.IsError {
+		t.Fatalf("result=%v err=%v", result, err)
+	}
+	if len(result.Content) == 0 {
+		t.Fatal("empty result")
+	}
+	text, ok := result.Content[0].(mcp.TextContent)
+	if !ok {
+		t.Fatalf("unexpected content %#v", result.Content[0])
+	}
+	var body map[string]any
+	if err := json.Unmarshal([]byte(text.Text), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["status"] != "completed" || body["task_id"] != "task-tool" {
+		t.Fatalf("body=%#v", body)
 	}
 }
 

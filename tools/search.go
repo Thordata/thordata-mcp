@@ -11,6 +11,7 @@ import (
 	"thordata-mcp/internal/dataset"
 	"thordata-mcp/internal/schema"
 	"thordata-mcp/internal/serp"
+	"thordata-mcp/internal/webscraper"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -19,6 +20,8 @@ type ToolSet struct {
 	cache              *schema.Cache
 	serpClient         *serp.Client
 	datasetClient      *dataset.Client
+	webScraperCache    *webscraper.Cache
+	webScraperClient   *webscraper.Client
 	historyEndpoint    string
 	statisticsEndpoint string
 	httpClient         *httpClient

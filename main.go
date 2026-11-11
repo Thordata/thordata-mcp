@@ -21,6 +21,7 @@ import (
 	"thordata-mcp/internal/dataset"
 	"thordata-mcp/internal/schema"
 	"thordata-mcp/internal/serp"
+	"thordata-mcp/internal/webscraper"
 	"thordata-mcp/tools"
 )
 
@@ -30,18 +31,24 @@ const (
 )
 
 type config struct {
-	ListenAddr         string        `yaml:"listen_addr"`
-	SchemaEndpoint     string        `yaml:"schema_endpoint"`
-	SerpEndpoint       string        `yaml:"serp_endpoint"`
-	HistoryEndpoint    string        `yaml:"history_endpoint"`
-	StatisticsEndpoint string        `yaml:"statistics_endpoint"`
-	DatasetEndpoint    string        `yaml:"dataset_endpoint"`
-	SchemaTimeout      time.Duration `yaml:"-"`
-	Timeout            time.Duration `yaml:"-"`
-	ShutdownTimeout    time.Duration `yaml:"-"`
-	SchemaTimeoutMS    int           `yaml:"schema_timeout_ms"`
-	TimeoutMS          int           `yaml:"timeout_ms"`
-	ShutdownTimeoutMS  int           `yaml:"shutdown_timeout_ms"`
+	ListenAddr                 string        `yaml:"listen_addr"`
+	SchemaEndpoint             string        `yaml:"schema_endpoint"`
+	SerpEndpoint               string        `yaml:"serp_endpoint"`
+	HistoryEndpoint            string        `yaml:"history_endpoint"`
+	StatisticsEndpoint         string        `yaml:"statistics_endpoint"`
+	DatasetEndpoint            string        `yaml:"dataset_endpoint"`
+	WebScraperSchemaEndpoint   string        `yaml:"web_scraper_schema_endpoint"`
+	WebScraperBuilderEndpoint  string        `yaml:"web_scraper_builder_endpoint"`
+	WebScraperTaskEndpoint     string        `yaml:"web_scraper_task_endpoint"`
+	WebScraperDownloadEndpoint string        `yaml:"web_scraper_download_endpoint"`
+	SchemaTimeout              time.Duration `yaml:"-"`
+	Timeout                    time.Duration `yaml:"-"`
+	ShutdownTimeout            time.Duration `yaml:"-"`
+	WebScraperTimeout          time.Duration `yaml:"-"`
+	SchemaTimeoutMS            int           `yaml:"schema_timeout_ms"`
+	TimeoutMS                  int           `yaml:"timeout_ms"`
+	ShutdownTimeoutMS          int           `yaml:"shutdown_timeout_ms"`
+	WebScraperTimeoutMS        int           `yaml:"web_scraper_timeout_ms"`
 }
 
 func main() {
@@ -91,12 +98,19 @@ func loadConfig(path string) (config, error) {
 	if cfg.DatasetEndpoint == "" {
 		cfg.DatasetEndpoint = "https://api.thordata.com/api/mcp-datasets/v1"
 	}
+	if cfg.WebScraperTimeoutMS <= 0 {
+		cfg.WebScraperTimeoutMS = 300000
+	}
+	if cfg.WebScraperTimeoutMS > 300000 {
+		cfg.WebScraperTimeoutMS = 300000
+	}
 	if cfg.ShutdownTimeoutMS <= 0 {
 		cfg.ShutdownTimeoutMS = 10000
 	}
 	cfg.Timeout = time.Duration(cfg.TimeoutMS) * time.Millisecond
 	cfg.SchemaTimeout = time.Duration(cfg.SchemaTimeoutMS) * time.Millisecond
 	cfg.ShutdownTimeout = time.Duration(cfg.ShutdownTimeoutMS) * time.Millisecond
+	cfg.WebScraperTimeout = time.Duration(cfg.WebScraperTimeoutMS) * time.Millisecond
 	return cfg, nil
 }
 
@@ -129,6 +143,8 @@ func mcpHandler(cfg config) http.Handler {
 	cache := schema.NewCache(schema.NewClient(cfg.SchemaEndpoint, cfg.SchemaTimeout))
 	toolSet := tools.New(cache, serp.NewClient(cfg.SerpEndpoint), cfg.HistoryEndpoint, cfg.StatisticsEndpoint, cfg.Timeout)
 	toolSet.SetDatasetClient(dataset.NewClient(cfg.DatasetEndpoint, cfg.Timeout))
+	webScraperCache := webscraper.NewCache(webscraper.NewSchemaClient(cfg.WebScraperSchemaEndpoint, 5*time.Second))
+	toolSet.SetWebScraper(webScraperCache, webscraper.NewClient(webscraper.Endpoints{Builder: cfg.WebScraperBuilderEndpoint, TaskAPI: cfg.WebScraperTaskEndpoint, Download: cfg.WebScraperDownloadEndpoint}, cfg.WebScraperTimeout))
 	s := server.NewMCPServer(serverName, serverVersion, server.WithToolCapabilities(true), server.WithResourceCapabilities(true, true), server.WithRecovery(), server.WithOutputSchemaValidation())
 	s.AddTool(toolSet.ListEnginesTool(), toolSet.HandleListEngines)
 	s.AddTool(toolSet.SearchTool(), toolSet.HandleSearch)
@@ -138,9 +154,20 @@ func mcpHandler(cfg config) http.Handler {
 	s.AddTool(toolSet.ListDatasetsTool(), toolSet.HandleListDatasets)
 	s.AddTool(toolSet.DatasetInfoTool(), toolSet.HandleDatasetInfo)
 	s.AddTool(toolSet.DatasetRequestStatusTool(), toolSet.HandleDatasetRequestStatus)
+	s.AddTool(toolSet.ListWebScrapersTool(), toolSet.HandleListWebScrapers)
+	s.AddTool(toolSet.FetchWebScraperTool(), toolSet.HandleFetchWebScraper)
 	index := mcp.NewResource("thordata://engines", "Thor SERP engines", mcp.WithMIMEType("application/json"))
 	s.AddResource(index, func(ctx context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 		doc, err := cache.ListDocument(ctx)
+		if err != nil {
+			return nil, err
+		}
+		body, _ := json.Marshal(doc)
+		return []mcp.ResourceContents{mcp.TextResourceContents{URI: req.Params.URI, MIMEType: "application/json", Text: string(body)}}, nil
+	})
+	webIndex := mcp.NewResource(tools.WebScrapersURI, "Thor Web Scraper products", mcp.WithMIMEType("application/json"))
+	s.AddResource(webIndex, func(ctx context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		doc, err := toolSet.WebScrapersDocument(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -155,6 +182,19 @@ func mcpHandler(cfg config) http.Handler {
 		}
 		key := strings.TrimPrefix(req.Params.URI, prefix)
 		doc, err := cache.EngineDocument(key)
+		if err != nil {
+			return nil, err
+		}
+		body, _ := json.Marshal(doc)
+		return []mcp.ResourceContents{mcp.TextResourceContents{URI: req.Params.URI, MIMEType: "application/json", Text: string(body)}}, nil
+	})
+	webTemplate := mcp.NewResourceTemplate(tools.WebScrapersURI+"/{spider_id}", "Thor Web Scraper schema", mcp.WithTemplateMIMEType("application/json"))
+	s.AddResourceTemplate(webTemplate, func(ctx context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		const prefix = tools.WebScrapersURI + "/"
+		if !strings.HasPrefix(req.Params.URI, prefix) {
+			return nil, fmt.Errorf("invalid Web Scraper resource URI")
+		}
+		doc, err := toolSet.WebScraperDocument(ctx, strings.TrimPrefix(req.Params.URI, prefix))
 		if err != nil {
 			return nil, err
 		}

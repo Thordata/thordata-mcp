@@ -27,9 +27,14 @@ serp_endpoint: "https://scraperapi.thordata.com/request"
 history_endpoint: "https://api.thordata.com/mcp/serp/history"
 statistics_endpoint: "https://api.thordata.com/mcp/serp/statistics"
 dataset_endpoint: "https://api.thordata.com/api/mcp-datasets/v1"
+web_scraper_schema_endpoint: "https://api.thordata.com/web-scraper/schema"
+web_scraper_builder_endpoint: "https://scraperapi.thordata.com/builder"
+web_scraper_task_endpoint: "https://api.thordata.com/api/web-scraper-api"
+web_scraper_download_endpoint: "https://scraperapi.thordata.com/download"
 schema_timeout_ms: 30000
 timeout_ms: 120000
 shutdown_timeout_ms: 10000
+web_scraper_timeout_ms: 300000
 ```
 
 After startup, the service exposes:
@@ -51,9 +56,14 @@ For local self-testing, point your MCP client at `http://127.0.0.1:8800/mcp` (or
 | `history_endpoint` | Endpoint for the authenticated user's SERP history. |
 | `statistics_endpoint` | Endpoint for the authenticated user's SERP statistics. |
 | `dataset_endpoint` | Endpoint for the dataset tools. Defaults to the public dataset API. |
+| `web_scraper_schema_endpoint` | Endpoint returning the Web Scraper product schema. |
+| `web_scraper_builder_endpoint` | Web Scraper task submission endpoint. |
+| `web_scraper_task_endpoint` | Web Scraper task status endpoint. |
+| `web_scraper_download_endpoint` | Web Scraper result download endpoint. |
 | `schema_timeout_ms` | Timeout for loading the remote schema. Defaults to 30000 ms. |
 | `timeout_ms` | Timeout for SERP, history, statistics, and dataset upstream requests. Defaults to 120000 ms. |
 | `shutdown_timeout_ms` | Graceful HTTP server shutdown timeout. Defaults to 10000 ms. |
+| `web_scraper_timeout_ms` | Timeout for Web Scraper tasks. Defaults to and is capped at 300000 ms. |
 
 The YAML decoder rejects unknown fields. Non-positive timeout values use the built-in defaults.
 

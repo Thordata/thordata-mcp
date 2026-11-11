@@ -95,6 +95,24 @@ If your client can set headers, either form works:
 
 Use `list_datasets` to see the dataset packages currently available to your account. `get_dataset_info` returns the price and limits for one `dataset_key`. Neither call charges the wallet.
 
+### Web Scraper tools
+
+Web Scraper uses the same Dataset/Web Scraper API key. The MCP server supports exactly these seven products:
+
+| `spider_id` | Required parameters | Optional parameters |
+| --- | --- | --- |
+| `linkedin_company_information_by-url` | `url` | — |
+| `linkedin_job_listings_information_by-job-url` | `job_url` | — |
+| `youtube_video-post_by-keyword` | `keyword` | `num_of_posts` |
+| `facebook_profile_by-profiles-url` | `url` | — |
+| `youtube_video-post_by-explore` | `url` | `all_tabs` |
+| `twitter_profile_by-profileurl` | `url` | — |
+| `amazon_product_by-category-url` | `url`, `page_turning` | `sort_by` |
+
+Read `thordata://web-scrapers` or call `list_web_scrapers` to obtain the current public field schema. Then call `fetch_web_scraper` with the selected `spider_id` and its `parameters` object. The server validates the fields against the public schema, creates one remote task, polls it, downloads the final JSON and returns the records.
+
+`fetch_web_scraper` waits up to five minutes. `max_wait_seconds` may be set from 30 to 300, with 300 as the default. A timeout stops this MCP call but leaves the remote task running; the error includes the `task_id`, and the server never automatically resubmits an uncertain task. `include_errors` defaults to `true`, and `file_name` defaults to `{{TasksID}}`.
+
 For a Claude Code one-line install, run:
 
 ```text
@@ -116,6 +134,8 @@ A typical call flow is:
 - **`list_engines`** — see the current engine list, query field, and schema resources.
 - **`history`** — query SERP request history for your own account.
 - **`statistics`** — query SERP usage statistics for your own account.
+- **`list_web_scrapers`** — list the seven supported Web Scraper products and their current parameters.
+- **`fetch_web_scraper`** — run one supported Web Scraper and wait for its final JSON result.
 
 History and statistics are scoped to the API key you send; you cannot query another user's data.
 
@@ -197,6 +217,8 @@ Queries SERP usage statistics for the API-key owner.
 | --- | --- |
 | `thordata://engines` | Index of the current supported engine definitions. |
 | `thordata://engines/<engine-key>` | Groups, fields, controls, defaults, options, and conditions for one engine. |
+| `thordata://web-scrapers` | Index of the supported Web Scraper products and parameters. |
+| `thordata://web-scrapers/<spider_id>` | Current fields, required flags, defaults and options for one Web Scraper product. |
 
 ## Building correct parameters
 

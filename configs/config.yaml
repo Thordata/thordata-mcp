@@ -4,6 +4,11 @@ serp_endpoint: "https://scraperapi.thordata.com/request"
 history_endpoint: "https://api.thordata.com/mcp/serp/history"
 statistics_endpoint: "https://api.thordata.com/mcp/serp/statistics"
 dataset_endpoint: "https://api.thordata.com/api/mcp-datasets/v1"
+web_scraper_schema_endpoint: "https://api.thordata.com/web-scraper/schema"
+web_scraper_builder_endpoint: "https://scraperapi.thordata.com/builder"
+web_scraper_task_endpoint: "https://api.thordata.com/api/web-scraper-api"
+web_scraper_download_endpoint: "https://scraperapi.thordata.com/download"
 schema_timeout_ms: 30000
 timeout_ms: 120000
 shutdown_timeout_ms: 10000
+web_scraper_timeout_ms: 300000

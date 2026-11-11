@@ -9,12 +9,18 @@ import (
 
 	"thordata-mcp/internal/auth"
 	"thordata-mcp/internal/dataset"
+	"thordata-mcp/internal/webscraper"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
 func (t *ToolSet) SetDatasetClient(client *dataset.Client) {
 	t.datasetClient = client
+}
+
+func (t *ToolSet) SetWebScraper(cache *webscraper.Cache, client *webscraper.Client) {
+	t.webScraperCache = cache
+	t.webScraperClient = client
 }
 
 func (t *ToolSet) FetchDatasetTool() mcp.Tool {
